@@ -133,7 +133,7 @@ local Settings = {
 	Keybinds = {
 		["INCREASE"] = KEY.U;
 		["DECREASE"] = KEY.J;
-		["TOGGLE"] = KEY.R;
+		["TOGGLE"] = KEY.LeftControl;
 		["INCREASE_HRP"] = KEY.Nine;
 		["DECREASE_HRP"] = KEY.Eight;
 		["TOGGLE_TEAMMATES"] = KEY.T;
@@ -192,8 +192,28 @@ local function forceNoCollideHRP(player)
 	end
 end
 
+local function instantResetHRPOnDeath(character)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if humanoid and hrp then
+		if humanoid.Health <= 0 then
+			hrp.Size = Vector3.new(2,2,1)
+			hrp.CanCollide = false
+			hrp.Transparency = 1
+		end
+		humanoid.Died:Connect(function()
+			if hrp then
+				hrp.Size = Vector3.new(2,2,1)
+				hrp.CanCollide = false
+				hrp.Transparency = 1
+			end
+		end)
+	end
+end
+
 local function setupDeathReset(player)
 	local function connectDeath(character)
+		instantResetHRPOnDeath(character)
 		local humanoid = character:FindFirstChildOfClass("Humanoid")
 		if humanoid then
 			humanoid.Died:Connect(function()
@@ -201,17 +221,19 @@ local function setupDeathReset(player)
 					resetPlayerHitbox(player)
 					reachedPlayers[player] = nil
 				end
-
+				
 				local hrp = character:FindFirstChild("HumanoidRootPart")
 				if hrp then
 					hrp.CanCollide = false
 				end
 			end)
 		end
-
+		
 		local hrp = character:FindFirstChild("HumanoidRootPart")
 		if hrp and humanoid and humanoid.Health <= 0 then
+			hrp.Size = Vector3.new(2,2,1)
 			hrp.CanCollide = false
+			hrp.Transparency = 1
 		end
 	end
 	if player.Character then
@@ -270,7 +292,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
-local function forceNoCollideAllDeadPlayers()
+local function forceNoCollideAndResetAllDeadPlayers()
 	for _, player in ipairs(Players:GetPlayers()) do
 		if player ~= localPlayer then
 			local char = player.Character
@@ -278,7 +300,9 @@ local function forceNoCollideAllDeadPlayers()
 				local humanoid = char:FindFirstChildOfClass("Humanoid")
 				local hrp = char:FindFirstChild("HumanoidRootPart")
 				if humanoid and hrp and humanoid.Health <= 0 then
+					hrp.Size = Vector3.new(2,2,1)
 					hrp.CanCollide = false
+					hrp.Transparency = 1
 				end
 			end
 		end
@@ -307,9 +331,17 @@ RunService.Heartbeat:Connect(function()
 			local phrp = pchar and pchar:FindFirstChild("HumanoidRootPart")
 			local phumanoid = pchar and pchar:FindFirstChildOfClass("Humanoid")
 			if phrp then
-
-				if phumanoid and phumanoid.Health <= 0 then
+				-- Always force HRP to be non-collidable when HBE is on, even if alive
+				-- Also, always force CanCollide false for all reached players
+				if reachedPlayers[player] then
 					phrp.CanCollide = false
+				end
+
+				-- Always force dead players' HRP to be non-collidable and reset size
+				if phumanoid and phumanoid.Health <= 0 then
+					phrp.Size = Vector3.new(2,2,1)
+					phrp.CanCollide = false
+					phrp.Transparency = 1
 				end
 
 				local dist = (hrp.Position - phrp.Position).Magnitude
@@ -325,6 +357,8 @@ RunService.Heartbeat:Connect(function()
 						if phrp.Size.X ~= size or phrp.Size.Y ~= size or phrp.Size.Z ~= size then
 							phrp.Size = Vector3.new(size, size, size)
 						end
+						-- Always force CanCollide false while HBE is on
+						phrp.CanCollide = false
 					end
 				else
 					if reachedPlayers[player] then
@@ -341,8 +375,7 @@ RunService.Heartbeat:Connect(function()
 			reachedPlayers[trackedPlayer] = nil
 		end
 	end
-
-	forceNoCollideAllDeadPlayers()
+	forceNoCollideAndResetAllDeadPlayers()
 end)
 
-notify("Reach script loaded! R to toggle, U/J to change radius, 9/8 to change HRP size, T to toggle teammate ignore.")
+notify("Left Control to toggle, U/J to change radius, 9/8 to change HRP size, T to toggle teammate ignore.")
