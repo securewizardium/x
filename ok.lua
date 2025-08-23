@@ -148,6 +148,7 @@ local Settings = {
         ['INCREASE_HRP'] = KEY.Nine,
         ['DECREASE_HRP'] = KEY.Eight,
         ['TOGGLE_TEAMMATES'] = KEY.T,
+        ['FINE_HRP_MOD'] = KEY.Seven, 
     },
     Values = {
         ['radius'] = 10,
@@ -157,9 +158,15 @@ local Settings = {
     },
     RADIUS_INCREMENT = 1,
     HRP_INCREMENT = 0.5,
+    HRP_FINE_INCREMENT = 0.1,
     HRP_MIN = 1,
     HRP_MAX = 15,
 }
+
+local function round(num, decimals)
+    local mult = 10 ^ (decimals or 1)
+    return math.floor(num * mult + 0.5) / mult
+end
 
 local function notify(text)
     StarterGui:SetCore('SendNotification', {
@@ -265,17 +272,26 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
+local isFineHRPModHeld = false
+
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then
         return
     end
     local key = input.KeyCode
+
+    if key == Settings.Keybinds.FINE_HRP_MOD then
+        isFineHRPModHeld = true
+        return
+    end
+
     if key == Settings.Keybinds.INCREASE then
         Settings.Values.radius = math.clamp(
             Settings.Values.radius + Settings.RADIUS_INCREMENT,
             1,
             50
         )
+        Settings.Values.radius = round(Settings.Values.radius, 1)
         notify('Radius: ' .. tostring(Settings.Values.radius))
     elseif key == Settings.Keybinds.DECREASE then
         Settings.Values.radius = math.clamp(
@@ -283,6 +299,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             1,
             50
         )
+        Settings.Values.radius = round(Settings.Values.radius, 1)
         notify('Radius: ' .. tostring(Settings.Values.radius))
     elseif key == Settings.Keybinds.TOGGLE then
         Settings.Values.enabled = not Settings.Values.enabled
@@ -296,18 +313,22 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             reachedPlayers = {}
         end
     elseif key == Settings.Keybinds.INCREASE_HRP then
+        local increment = isFineHRPModHeld and Settings.HRP_FINE_INCREMENT or Settings.HRP_INCREMENT
         Settings.Values.hrpSize = math.clamp(
-            Settings.Values.hrpSize + Settings.HRP_INCREMENT,
+            Settings.Values.hrpSize + increment,
             Settings.HRP_MIN,
             Settings.HRP_MAX
         )
+        Settings.Values.hrpSize = round(Settings.Values.hrpSize, 1)
         notify('HRP Size: ' .. tostring(Settings.Values.hrpSize))
     elseif key == Settings.Keybinds.DECREASE_HRP then
+        local increment = isFineHRPModHeld and Settings.HRP_FINE_INCREMENT or Settings.HRP_INCREMENT
         Settings.Values.hrpSize = math.clamp(
-            Settings.Values.hrpSize - Settings.HRP_INCREMENT,
+            Settings.Values.hrpSize - increment,
             Settings.HRP_MIN,
             Settings.HRP_MAX
         )
+        Settings.Values.hrpSize = round(Settings.Values.hrpSize, 1)
         notify('HRP Size: ' .. tostring(Settings.Values.hrpSize))
     elseif key == Settings.Keybinds.TOGGLE_TEAMMATES then
         Settings.Values.ignoreTeammates = not Settings.Values.ignoreTeammates
@@ -323,6 +344,12 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 end
             end
         end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.KeyCode == Settings.Keybinds.FINE_HRP_MOD then
+        isFineHRPModHeld = false
     end
 end)
 
@@ -374,13 +401,10 @@ RunService.Heartbeat:Connect(function()
             local phrp = pchar and pchar:FindFirstChild('HumanoidRootPart')
             local phumanoid = pchar and pchar:FindFirstChildOfClass('Humanoid')
             if phrp then
-                -- Always force HRP to be non-collidable when HBE is on, even if alive
-                -- Also, always force CanCollide false for all reached players
                 if reachedPlayers[player] then
                     phrp.CanCollide = false
                 end
-
-                -- Always force dead players' HRP to be non-collidable and reset size
+                
                 if phumanoid and phumanoid.Health <= 0 then
                     phrp.Size = Vector3.new(2, 2, 1)
                     phrp.CanCollide = false
@@ -407,7 +431,7 @@ RunService.Heartbeat:Connect(function()
                         then
                             phrp.Size = Vector3.new(size, size, size)
                         end
-                        -- Always force CanCollide false while HBE is on
+                        
                         phrp.CanCollide = false
                     end
                 else
@@ -429,5 +453,5 @@ RunService.Heartbeat:Connect(function()
 end)
 
 notify(
-    'Left Control to toggle, U/J to change radius, 9/8 to change HRP size, T to toggle teammate ignore.'
+    'Left Control to toggle, U/J to change radius, 9/8 to change HRP size, hold 7 for fine HRP size, T to toggle teammate ignore.'
 )
