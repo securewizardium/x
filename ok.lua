@@ -132,6 +132,8 @@ game.Players.PlayerAdded:Connect(function(player)
     end)
 end)
 
+task.wait(3)
+
 local KEY = Enum.KeyCode
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
